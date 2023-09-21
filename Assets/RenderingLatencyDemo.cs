@@ -38,6 +38,7 @@ public partial class RenderingLatencyDemo : Node2D
     private string hudText = "";
     private Rect rect = new Rect(0, 0, Screen.width, Screen.height);
     private GUIStyle style;
+    private FullScreenMode displayedFullScreenMode;
 #else
     private Label label;
     private string engineVersion;
@@ -242,6 +243,12 @@ public partial class RenderingLatencyDemo : Node2D
         if (GetKeyDown(KeyCode.Escape))
             StopThread();
 
+#if UNITY
+        // This value takes at least one frame to update.
+        if (Screen.fullScreenMode != displayedFullScreenMode)
+            updateHUDText();
+#endif
+
         if (additionalFrameTimeMs > 0)
             Thread.Sleep(additionalFrameTimeMs);
 
@@ -291,6 +298,8 @@ public partial class RenderingLatencyDemo : Node2D
     private void updateHUDText()
     {
 #if UNITY
+        displayedFullScreenMode = Screen.fullScreenMode;
+
         hudText =
 #else
         label.Text =
@@ -307,7 +316,7 @@ public partial class RenderingLatencyDemo : Node2D
             $"QualitySettings.vSyncCount: {QualitySettings.vSyncCount}\n" +
             $"QualitySettings.maxQueuedFrames: {QualitySettings.maxQueuedFrames}\n" +
             $"Application.targetFrameRate: {Application.targetFrameRate}\n" +
-            $"Screen.fullScreenMode: {Screen.fullScreenMode}\n" +
+            $"Screen.fullScreenMode: {displayedFullScreenMode}\n" +
 #else
             $"VsyncMode: {DisplayServer.WindowGetVsyncMode()}\n" +
             // QualitySettings.maxQueuedFrames?
