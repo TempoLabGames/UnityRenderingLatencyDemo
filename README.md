@@ -2,6 +2,8 @@
 
 Visually demonstrates the effects of Unity's rendering latency settings.
 
+**Update:** Now also usable in Godot!
+
 This is intended to help developers decide which defaults to use
 and which options to expose to users via settings.
 

@@ -1,15 +1,50 @@
-﻿// https://wiki.unity3d.com/index.php/FramesPerSecond
+#if UNITY_5_3_OR_NEWER || UNITY_5_2
+#define UNITY
+#endif
+// https://wiki.unity3d.com/index.php/FramesPerSecond
+#if UNITY
 using UnityEngine;
+#else
+using Godot;
+#endif
 
+#if UNITY
 public class FPSDisplay : MonoBehaviour
+#else
+public partial class FPSDisplay : Node2D
+#endif
 {
     float deltaTime = 0.0f;
 
-    void Update()
+#if !UNITY
+    private Label label;
+
+    public override void _Ready()
     {
-        deltaTime += (Time.unscaledDeltaTime - deltaTime) * 0.1f;
+        label = new Label();
+        label.Size = GetViewport().GetVisibleRect().Size;
+        label.Position = new Vector2(-10, 10);
+        label.HorizontalAlignment = HorizontalAlignment.Right;
+        AddChild(label);
+    }
+#endif
+
+#if UNITY
+    void Update()
+#else
+    public override void _Process(double delta)
+#endif
+    {
+#if UNITY
+        var delta = Time.unscaledDeltaTime;
+#endif
+        deltaTime += ((float)delta - deltaTime) * 0.1f;
+#if !UNITY
+        label.Text = GetText();
+#endif
     }
 
+#if UNITY
     void OnGUI()
     {
         int w = Screen.width, h = Screen.height;
@@ -20,9 +55,15 @@ public class FPSDisplay : MonoBehaviour
         style.alignment = TextAnchor.UpperRight;
         style.fontSize = h * 2 / 100;
         style.normal.textColor = Color.white;
+        string text = GetText();
+        GUI.Label(rect, text, style);
+    }
+#endif
+
+    private string GetText()
+    {
         float msec = deltaTime * 1000.0f;
         float fps = 1.0f / deltaTime;
-        string text = string.Format("{0:0.0} ms\n({1:0.} fps)", msec, fps);
-        GUI.Label(rect, text, style);
+        return $"{msec:0.0} ms\n({fps:0.} fps)";
     }
 }
