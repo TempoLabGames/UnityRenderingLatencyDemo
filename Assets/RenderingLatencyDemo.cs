@@ -62,6 +62,7 @@ public partial class RenderingLatencyDemo : Node2D
                 textColor = Color.white,
             },
         };
+        Screen.fullScreenMode = FullScreenMode.FullScreenWindow;
 #else
         KeyCode.AddActions();
         label = new Label();
@@ -145,6 +146,25 @@ public partial class RenderingLatencyDemo : Node2D
             additionalFrameTimeMs--;
             if (additionalFrameTimeMs < 0)
                 additionalFrameTimeMs = 0;
+            updateHUDText();
+        }
+        if (GetKeyDown(KeyCode.Tab))
+        {
+#if UNITY
+            var mode = Screen.fullScreenMode;
+            if (mode == FullScreenMode.FullScreenWindow)
+                mode = FullScreenMode.ExclusiveFullScreen;
+            else
+                mode = FullScreenMode.FullScreenWindow;
+            Screen.fullScreenMode = mode;
+#else
+            var mode = DisplayServer.WindowGetMode();
+            if (mode == DisplayServer.WindowMode.Fullscreen)
+                mode = DisplayServer.WindowMode.ExclusiveFullscreen;
+            else
+                mode = DisplayServer.WindowMode.Fullscreen;
+            DisplayServer.WindowSetMode(mode);
+#endif
             updateHUDText();
         }
         if (GetKeyDown(KeyCode.Alpha1))
@@ -287,16 +307,19 @@ public partial class RenderingLatencyDemo : Node2D
             $"QualitySettings.vSyncCount: {QualitySettings.vSyncCount}\n" +
             $"QualitySettings.maxQueuedFrames: {QualitySettings.maxQueuedFrames}\n" +
             $"Application.targetFrameRate: {Application.targetFrameRate}\n" +
+            $"Screen.fullScreenMode: {Screen.fullScreenMode}\n" +
 #else
             $"VsyncMode: {DisplayServer.WindowGetVsyncMode()}\n" +
             // QualitySettings.maxQueuedFrames?
             $"MaxFps: {Engine.MaxFps}\n" +
+            $"Fullscreen: {DisplayServer.WindowGetMode()}\n" +
 #endif
             "\n" +
             $"Additional frame time (ms): {additionalFrameTimeMs}\n" +
             "\n" +
             "Up/Down: Change mouse pixels per ms\n" +
             "Left/Right: Change additional frame time\n" +
+            "Tab: Change fullscreen type\n" +
             "Space: Start moving mouse\n" +
             "Esc: Stop moving mouse\n" +
             "";
@@ -362,6 +385,7 @@ class KeyCode
     public const Key Alpha3 = Key.Key3;
     public const Key Alpha4 = Key.Key4;
     public const Key Alpha5 = Key.Key5;
+    public const Key Tab = Key.Tab;
     public const Key Space = Key.Space;
     public const Key Escape = Key.Escape;
 
@@ -375,6 +399,7 @@ class KeyCode
         Alpha3,
         Alpha4,
         Alpha5,
+        Tab,
         Space,
         Escape,
     };
