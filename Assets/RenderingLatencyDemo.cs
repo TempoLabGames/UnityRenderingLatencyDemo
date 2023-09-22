@@ -25,8 +25,12 @@ public partial class RenderingLatencyDemo : Node2D
     private int additionalFrameTimeMs = 0;
 #if UNITY
     private Color[] colors = { Color.white, Color.green, Color.yellow, Color.red, Color.magenta };
+    private Color idealColor = Color.gray;
+    private Color idealBorder = Color.black;
 #else
     private Color[] colors = { Colors.White, Colors.Green, Colors.Yellow, Colors.Red, Colors.Magenta };
+    private Color idealColor = Colors.Gray;
+    private Color idealBorder = Colors.Black;
 #endif
 
     private Thread thread = null;
@@ -46,6 +50,13 @@ public partial class RenderingLatencyDemo : Node2D
 
     private int screenWidth = 1080;
     private float mouseX = 0;
+    private float mouseY = 0;
+
+    // Ideal frame latency for a given configuration.
+    // If minIdeal == maxIdeal, expect stable cursor position with no tearing.
+    // If minIdeal != maxIdeal, expect unstable cursor position varying above and below tear lines.
+    private int? minIdeal;
+    private int? maxIdeal;
 
 #if UNITY
     void Start()
@@ -122,10 +133,13 @@ public partial class RenderingLatencyDemo : Node2D
 #if UNITY
         // Input.mousePosition is read at the start of the frame and cached.
         mouseX = Input.mousePosition.x;
+        mouseY = Screen.currentResolution.height - Input.mousePosition.y;
 #else
-        // GetViewport().GetMousePosition() updates in real time!
+        // GetGlobalMousePosition() updates in real time!
         // Cache it to get comparable test results.
-        mouseX = GetViewport().GetMousePosition().X;
+        var pos = GetGlobalMousePosition();
+        mouseX = pos.X;
+        mouseY = pos.Y;
 #endif
         if (GetKeyDown(KeyCode.UpArrow))
         {
@@ -171,6 +185,7 @@ public partial class RenderingLatencyDemo : Node2D
         if (GetKeyDown(KeyCode.Alpha1))
         {
             profileName = "VSync; queue 2 frames";
+            minIdeal = maxIdeal = 2;
 #if UNITY
             QualitySettings.vSyncCount = 1;
             QualitySettings.maxQueuedFrames = 2;
@@ -185,6 +200,7 @@ public partial class RenderingLatencyDemo : Node2D
         if (GetKeyDown(KeyCode.Alpha2))
         {
             profileName = "VSync; queue 1 frame";
+            minIdeal = maxIdeal = 1;
 #if UNITY
             QualitySettings.vSyncCount = 1;
             QualitySettings.maxQueuedFrames = 1;
@@ -199,6 +215,8 @@ public partial class RenderingLatencyDemo : Node2D
         if (GetKeyDown(KeyCode.Alpha3))
         {
             profileName = "Free; capped at refresh rate";
+            minIdeal = -1;
+            maxIdeal = 1;
 #if UNITY
             QualitySettings.vSyncCount = 0;
             QualitySettings.maxQueuedFrames = 1;
@@ -213,6 +231,8 @@ public partial class RenderingLatencyDemo : Node2D
         if (GetKeyDown(KeyCode.Alpha4))
         {
             profileName = "Free; capped at double refresh rate";
+            minIdeal = -1;
+            maxIdeal = 1;
 #if UNITY
             QualitySettings.vSyncCount = 0;
             QualitySettings.maxQueuedFrames = 1;
@@ -227,6 +247,8 @@ public partial class RenderingLatencyDemo : Node2D
         if (GetKeyDown(KeyCode.Alpha5))
         {
             profileName = "Free; uncapped";
+            minIdeal = -1;
+            maxIdeal = 0;
 #if UNITY
             QualitySettings.vSyncCount = 0;
             QualitySettings.maxQueuedFrames = 1;
@@ -270,11 +292,12 @@ public partial class RenderingLatencyDemo : Node2D
 #if UNITY
         GUI.Label(rect, hudText, style);
         var height = Screen.currentResolution.height;
+        var width = Screen.currentResolution.width;
 #else
         var height = (int)GetViewport().GetVisibleRect().Size.Y;
 #endif
         // Each line represents 1 frame worth of movement, starting at 0 frames.
-        for (int i = 0; i < colors.Length; i++)
+        for (int i = -1; i < colors.Length; i++)
         {
 #if UNITY
             var refreshRate = Screen.currentResolution.refreshRate;
@@ -284,15 +307,27 @@ public partial class RenderingLatencyDemo : Node2D
             var msPerFrame = 1f / refreshRate * 1000;
             var pixelsPerFrame = pixelsPerMs * msPerFrame;
             var lineX = mouseX + i * pixelsPerFrame;
-#if UNITY
-            var rect = new Rect(lineX, 0, 1, height);
-            GUI.DrawTexture(rect, pixel, ScaleMode.StretchToFill, false, 0, colors[i], 0, 0);
-#else
-            var top = new Vector2(lineX, 0);
-            var bottom = new Vector2(lineX, height);
-            DrawLine(top, bottom, colors[i], 1);
-#endif
+            if (i != -1)
+                DrawVerticalLine(lineX, 0, height, colors[i]);
+            if (i >= minIdeal && i <= maxIdeal)
+            {
+                DrawVerticalLine(lineX, mouseY - 10, 40, idealColor);
+                DrawVerticalLine(lineX, mouseY - 10, 2, idealBorder);
+                DrawVerticalLine(lineX, mouseY - 10 + 40, 2, idealBorder);
+            }
         }
+    }
+
+    private void DrawVerticalLine(float x, float y, float length, Color color)
+    {
+#if UNITY
+        var rect = new Rect(x, y, 1, length);
+        GUI.DrawTexture(rect, pixel, ScaleMode.StretchToFill, false, 0, color, 0, 0);
+#else
+        var top = new Vector2(x, y);
+        var bottom = top + new Vector2(0, length);
+        DrawLine(top, bottom, color, 1);
+#endif
     }
 
     private void updateHUDText()
