@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 #if UNITY
 using UnityEngine;
+using UnityEngine.Rendering;
 #else
 using Godot;
 using Environment = System.Environment;
@@ -213,11 +214,12 @@ public partial class RenderingLatencyDemo : Node2D
             var i = modes.IndexOf(mode);
             i = (i + 1) % modes.Count;
 #if UNITY
-            // FullScreenMode.ExclusiveFullScreen is not supported by Vulkan.
+            // FullScreenMode.ExclusiveFullScreen is only supported with Direct3D11/12.
             // Note this is *not* the same as WindowMode.ExclusiveFullscreen in Godot
             // (which is actually equivalent to FullScreenMode.FullScreenWindow).
-            if (modes[i] == FullScreenMode.ExclusiveFullScreen && SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Vulkan)
-                i = (i + 1) % modes.Count;
+            if (modes[i] == FullScreenMode.ExclusiveFullScreen)
+                if (SystemInfo.graphicsDeviceType != GraphicsDeviceType.Direct3D11 && SystemInfo.graphicsDeviceType != GraphicsDeviceType.Direct3D12)
+                    i = (i + 1) % modes.Count;
             Screen.fullScreenMode = modes[i];
 #else
             DisplayServer.WindowSetMode(modes[i]);
