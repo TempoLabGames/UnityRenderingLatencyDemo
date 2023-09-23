@@ -48,6 +48,7 @@ public partial class RenderingLatencyDemo : Node2D
     private string engineVersion;
 #endif
 
+    private int screenX = 0;
     private int screenWidth = 1080;
     private float mouseX = 0;
     private float mouseY = 0;
@@ -55,8 +56,16 @@ public partial class RenderingLatencyDemo : Node2D
     // Ideal frame latency for a given configuration.
     // If minIdeal == maxIdeal, expect stable cursor position with no tearing.
     // If minIdeal != maxIdeal, expect unstable cursor position varying above and below tear lines.
-    private int? minIdeal;
-    private int? maxIdeal;
+    private int? minIdealF;
+    private int? maxIdealF;
+    private int? minIdealW;
+    private int? maxIdealW;
+
+#if UNITY
+    private bool FullScreen => Screen.fullScreen;
+#else
+    private bool FullScreen => DisplayServer.WindowGetMode() >= DisplayServer.WindowMode.Fullscreen;
+#endif
 
 #if UNITY
     void Start()
@@ -117,7 +126,7 @@ public partial class RenderingLatencyDemo : Node2D
         while (running)
         {
             var elapsed = DateTime.Now - start;
-            var x = (int)(elapsed.TotalMilliseconds * pixelsPerMs) % screenWidth;
+            var x = screenX + (int)(elapsed.TotalMilliseconds * pixelsPerMs) % screenWidth;
             var y = GetCursorPosition().Y;
             SetCursorPos(x, y);
             Thread.Sleep(1);
@@ -132,8 +141,9 @@ public partial class RenderingLatencyDemo : Node2D
     {
 #if UNITY
         // Input.mousePosition is read at the start of the frame and cached.
-        mouseX = Input.mousePosition.x;
-        mouseY = Screen.currentResolution.height - Input.mousePosition.y;
+        var pos = Input.mousePosition;
+        mouseX = pos.x;
+        mouseY = Screen.height - pos.y;
 #else
         // GetGlobalMousePosition() updates in real time!
         // Cache it to get comparable test results.
@@ -169,6 +179,8 @@ public partial class RenderingLatencyDemo : Node2D
             var mode = Screen.fullScreenMode;
             if (mode == FullScreenMode.FullScreenWindow)
                 mode = FullScreenMode.ExclusiveFullScreen;
+            else if (mode == FullScreenMode.ExclusiveFullScreen)
+                mode = FullScreenMode.Windowed;
             else
                 mode = FullScreenMode.FullScreenWindow;
             Screen.fullScreenMode = mode;
@@ -176,6 +188,8 @@ public partial class RenderingLatencyDemo : Node2D
             var mode = DisplayServer.WindowGetMode();
             if (mode == DisplayServer.WindowMode.Fullscreen)
                 mode = DisplayServer.WindowMode.ExclusiveFullscreen;
+            else if (mode == DisplayServer.WindowMode.ExclusiveFullscreen)
+                mode = DisplayServer.WindowMode.Windowed;
             else
                 mode = DisplayServer.WindowMode.Fullscreen;
             DisplayServer.WindowSetMode(mode);
@@ -185,7 +199,8 @@ public partial class RenderingLatencyDemo : Node2D
         if (GetKeyDown(KeyCode.Alpha1))
         {
             profileName = "VSync; queue 2 frames";
-            minIdeal = maxIdeal = 2;
+            minIdealF = maxIdealF = 2;
+            minIdealW = maxIdealW = 3;
 #if UNITY
             QualitySettings.vSyncCount = 1;
             QualitySettings.maxQueuedFrames = 2;
@@ -200,7 +215,8 @@ public partial class RenderingLatencyDemo : Node2D
         if (GetKeyDown(KeyCode.Alpha2))
         {
             profileName = "VSync; queue 1 frame";
-            minIdeal = maxIdeal = 1;
+            minIdealF = maxIdealF = 1;
+            minIdealW = maxIdealW = 2;
 #if UNITY
             QualitySettings.vSyncCount = 1;
             QualitySettings.maxQueuedFrames = 1;
@@ -215,8 +231,12 @@ public partial class RenderingLatencyDemo : Node2D
         if (GetKeyDown(KeyCode.Alpha3))
         {
             profileName = "Free; capped at refresh rate";
-            minIdeal = -1;
-            maxIdeal = 1;
+            // Negative latency can be achieved below tear lines.
+            minIdealF = -1;
+            maxIdealF = 1;
+            // No tearing occurs when windowed.
+            minIdealW = 1;
+            maxIdealW = 2;
 #if UNITY
             QualitySettings.vSyncCount = 0;
             QualitySettings.maxQueuedFrames = 1;
@@ -231,8 +251,12 @@ public partial class RenderingLatencyDemo : Node2D
         if (GetKeyDown(KeyCode.Alpha4))
         {
             profileName = "Free; capped at double refresh rate";
-            minIdeal = -1;
-            maxIdeal = 1;
+            // Negative latency can be achieved below tear lines.
+            minIdealF = -1;
+            maxIdealF = 1;
+            // No tearing occurs when windowed.
+            minIdealW = 1;
+            maxIdealW = 2;
 #if UNITY
             QualitySettings.vSyncCount = 0;
             QualitySettings.maxQueuedFrames = 1;
@@ -247,8 +271,11 @@ public partial class RenderingLatencyDemo : Node2D
         if (GetKeyDown(KeyCode.Alpha5))
         {
             profileName = "Free; uncapped";
-            minIdeal = -1;
-            maxIdeal = 0;
+            // Negative latency can be achieved below tear lines.
+            minIdealF = -1;
+            maxIdealF = 0;
+            // No tearing occurs when windowed.
+            minIdealW = maxIdealW = 1;
 #if UNITY
             QualitySettings.vSyncCount = 0;
             QualitySettings.maxQueuedFrames = 1;
@@ -275,10 +302,18 @@ public partial class RenderingLatencyDemo : Node2D
             Thread.Sleep(additionalFrameTimeMs);
 
 #if UNITY
-        screenWidth = Screen.currentResolution.width;
+        screenWidth = Screen.width;
+#if UNITY_2021_2_OR_NEWER
+        screenX = Screen.mainWindowPosition.x;
 #else
-        // This cannot be read in _Draw().
-        screenWidth = (int)GetViewport().GetVisibleRect().Size.X;
+        // Not supported.
+        screenX = 0;
+#endif
+#else
+        // This cannot be read off the main thread.
+        var window = GetWindow();
+        screenWidth = (int)window.Size.X;
+        screenX = (int)window.Position.X;
         QueueRedraw();
 #endif
     }
@@ -291,8 +326,7 @@ public partial class RenderingLatencyDemo : Node2D
     {
 #if UNITY
         GUI.Label(rect, hudText, style);
-        var height = Screen.currentResolution.height;
-        var width = Screen.currentResolution.width;
+        var height = Screen.height;
 #else
         var height = (int)GetViewport().GetVisibleRect().Size.Y;
 #endif
@@ -309,6 +343,17 @@ public partial class RenderingLatencyDemo : Node2D
             var lineX = mouseX + i * pixelsPerFrame;
             if (i != -1)
                 DrawVerticalLine(lineX, 0, height, colors[i]);
+            int? minIdeal, maxIdeal;
+            if (FullScreen)
+            {
+                minIdeal = minIdealF;
+                maxIdeal = maxIdealF;
+            }
+            else
+            {
+                minIdeal = minIdealW;
+                maxIdeal = maxIdealW;
+            }
             if (i >= minIdeal && i <= maxIdeal)
             {
                 DrawVerticalLine(lineX, mouseY - 10, 40, idealColor);
@@ -356,7 +401,7 @@ public partial class RenderingLatencyDemo : Node2D
             $"VsyncMode: {DisplayServer.WindowGetVsyncMode()}\n" +
             // QualitySettings.maxQueuedFrames?
             $"MaxFps: {Engine.MaxFps}\n" +
-            $"Fullscreen: {DisplayServer.WindowGetMode()}\n" +
+            $"WindowMode: {DisplayServer.WindowGetMode()}\n" +
 #endif
             "\n" +
             $"Additional frame time (ms): {additionalFrameTimeMs}\n" +
