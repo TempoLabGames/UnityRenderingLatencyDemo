@@ -12,8 +12,8 @@ Official documentation:
 * [QualitySettings.maxQueuedFrames](https://docs.unity3d.com/ScriptReference/QualitySettings-maxQueuedFrames.html)
 * [Application.targetFrameRate](https://docs.unity3d.com/ScriptReference/Application-targetFrameRate.html)
 
-**Note:** This currently only runs on Windows as it uses
-Windows-specific functions to manipulate the mouse position.
+**Note:** This currently only runs on Windows and Linux as it uses
+OS-specific functions to manipulate the mouse position.
 
 ## Quickstart
 

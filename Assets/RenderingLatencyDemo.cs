@@ -2,6 +2,7 @@
 #define UNITY
 #endif
 using System;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 #if UNITY
@@ -67,12 +68,22 @@ public partial class RenderingLatencyDemo : Node2D
     private bool FullScreen => DisplayServer.WindowGetMode() >= DisplayServer.WindowMode.Fullscreen;
 #endif
 
+    IntPtr xDisplay;
+    uint xRootWindow;
+
 #if UNITY
     void Start()
 #else
     public override void _Ready()
 #endif
     {
+        var platforms = new bool[] { Platform.IsWindows, Platform.IsLinux };
+        var matched = platforms.Where(x => x).Count();
+        if (matched == 0)
+            throw new Exception("Currently only support Windows and Linux");
+        if (matched != 1)
+            throw new Exception("Ambiguous platform (check Platform class)");
+
 #if UNITY
         style = new GUIStyle
         {
@@ -94,6 +105,13 @@ public partial class RenderingLatencyDemo : Node2D
         RenderingServer.SetDefaultClearColor(Colors.Black);
 #endif
         updateHUDText();
+
+        if (Platform.IsLinux)
+        {
+            xDisplay = XOpenDisplay(null);
+            xRootWindow = XRootWindow(xDisplay, 0);
+        }
+
         StartThread();
     }
 
@@ -127,8 +145,17 @@ public partial class RenderingLatencyDemo : Node2D
         {
             var elapsed = DateTime.Now - start;
             var x = screenX + (int)(elapsed.TotalMilliseconds * pixelsPerMs) % screenWidth;
-            var y = GetCursorPosition().Y;
-            SetCursorPos(x, y);
+            if (Platform.IsWindows)
+            {
+                var y = GetCursorPosition().Y;
+                SetCursorPos(x, y);
+            }
+            else
+            {
+                XQueryPointer(xDisplay, xRootWindow, out var _, out var _, out var _, out var y, out var _, out var _, out var _);
+                XWarpPointer(xDisplay, 0, xRootWindow, 0, 0, 0, 0, x, y);
+                XFlush(xDisplay);
+            }
             Thread.Sleep(1);
         }
     }
@@ -458,11 +485,36 @@ public partial class RenderingLatencyDemo : Node2D
 
     [DllImport("user32.dll")]
     static extern bool SetCursorPos(int X, int Y);
+
+    [DllImport("libX11")]
+    static extern IntPtr XOpenDisplay(string display_name);
+
+    [DllImport("libX11")]
+    static extern uint XRootWindow(IntPtr display, int screen_number);
+
+    [DllImport("libX11")]
+    static extern bool XQueryPointer(IntPtr display, uint w, out uint root_return, out uint child_return, out int root_x_return, out int root_y_return, out int win_x_return, out int win_y_return, out uint mask_return);
+
+    [DllImport("libX11")]
+    static extern int XWarpPointer(IntPtr display, uint src_w, uint dst_w, int src_x, int src_y, uint src_width, uint src_height, int dest_x, int dest_y);
+
+    [DllImport("libX11")]
+    static extern int XFlush(IntPtr display);
 }
 
 #if UNITY
-// Nothing to do.
+class Platform
+{
+    public static bool IsWindows => SystemInfo.operatingSystemFamily == OperatingSystemFamily.Windows;
+    public static bool IsLinux => SystemInfo.operatingSystemFamily == OperatingSystemFamily.Linux;
+}
 #else
+class Platform
+{
+    public static bool IsWindows => OS.GetName() == "Windows" || OS.GetName() == "UWP";
+    public static bool IsLinux => OS.GetName() == "Linux";
+}
+
 class KeyCode
 {
     public const Key UpArrow = Key.Up;
