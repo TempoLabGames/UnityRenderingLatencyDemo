@@ -2,6 +2,7 @@
 #define UNITY
 #endif
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -28,10 +29,12 @@ public partial class RenderingLatencyDemo : Node2D
     private Color[] colors = { Color.white, Color.green, Color.yellow, Color.red, Color.magenta };
     private Color idealColor = Color.gray;
     private Color idealBorder = Color.black;
+    private List<FullScreenMode> modes = new() { FullScreenMode.FullScreenWindow, FullScreenMode.ExclusiveFullScreen, FullScreenMode.Windowed };
 #else
     private Color[] colors = { Colors.White, Colors.Green, Colors.Yellow, Colors.Red, Colors.Magenta };
     private Color idealColor = Colors.Gray;
     private Color idealBorder = Colors.Black;
+    private List<DisplayServer.WindowMode> modes = new() { DisplayServer.WindowMode.Fullscreen, DisplayServer.WindowMode.ExclusiveFullscreen, DisplayServer.WindowMode.Windowed };
 #endif
 
     private Thread thread = null;
@@ -204,22 +207,20 @@ public partial class RenderingLatencyDemo : Node2D
         {
 #if UNITY
             var mode = Screen.fullScreenMode;
-            if (mode == FullScreenMode.FullScreenWindow)
-                mode = FullScreenMode.ExclusiveFullScreen;
-            else if (mode == FullScreenMode.ExclusiveFullScreen)
-                mode = FullScreenMode.Windowed;
-            else
-                mode = FullScreenMode.FullScreenWindow;
-            Screen.fullScreenMode = mode;
 #else
             var mode = DisplayServer.WindowGetMode();
-            if (mode == DisplayServer.WindowMode.Fullscreen)
-                mode = DisplayServer.WindowMode.ExclusiveFullscreen;
-            else if (mode == DisplayServer.WindowMode.ExclusiveFullscreen)
-                mode = DisplayServer.WindowMode.Windowed;
-            else
-                mode = DisplayServer.WindowMode.Fullscreen;
-            DisplayServer.WindowSetMode(mode);
+#endif
+            var i = modes.IndexOf(mode);
+            i = (i + 1) % modes.Count;
+#if UNITY
+            // FullScreenMode.ExclusiveFullScreen is not supported by Vulkan.
+            // Note this is *not* the same as WindowMode.ExclusiveFullscreen in Godot
+            // (which is actually equivalent to FullScreenMode.FullScreenWindow).
+            if (modes[i] == FullScreenMode.ExclusiveFullScreen && SystemInfo.graphicsDeviceType == UnityEngine.Rendering.GraphicsDeviceType.Vulkan)
+                i = (i + 1) % modes.Count;
+            Screen.fullScreenMode = modes[i];
+#else
+            DisplayServer.WindowSetMode(modes[i]);
 #endif
             updateHUDText();
         }
@@ -233,6 +234,7 @@ public partial class RenderingLatencyDemo : Node2D
             QualitySettings.maxQueuedFrames = 2;
             Application.targetFrameRate = -1;
 #else
+            profileName += " [WARNING: queued frames cannot be set at runtime]";
             DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Enabled);
             // QualitySettings.maxQueuedFrames = 2;
             Engine.MaxFps = 0;
@@ -249,6 +251,7 @@ public partial class RenderingLatencyDemo : Node2D
             QualitySettings.maxQueuedFrames = 1;
             Application.targetFrameRate = -1;
 #else
+            profileName += " [WARNING: queued frames cannot be set at runtime]";
             DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Enabled);
             // QualitySettings.maxQueuedFrames = 1;
             Engine.MaxFps = 0;
