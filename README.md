@@ -2,7 +2,7 @@
 
 Visually demonstrates the effects of Unity's rendering latency settings.
 
-**Update:** Now also usable in Godot!
+**Update:** Now also usable in Godot! (C#/.NET required)
 
 This is intended to help developers decide which defaults to use
 and which options to expose to users via settings.
@@ -19,6 +19,7 @@ Windows-specific functions to manipulate the mouse position.
 
 1. Open the project in Unity
 1. Build and run (do not run in editor)
+1. Press the number keys to test preset configurations
 
 ## How It Works
 
@@ -44,6 +45,10 @@ allows you to directly compare their effects.
 Adding additional frame time with the arrow keys allows you to
 simulate slower machines (or more complicated projects) and see
 how the application would respond when frames take longer to generate.
+
+The grey bands indicate optimal performance with the given settings.
+If your mouse is to the right of the grey bands, the rendering implementation
+is adding latency beyond the theoretical minimum.
 
 ## Recommendations
 
