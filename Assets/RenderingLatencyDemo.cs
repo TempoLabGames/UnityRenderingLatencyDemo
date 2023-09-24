@@ -30,12 +30,12 @@ public partial class RenderingLatencyDemo : Node2D
     private Color[] colors = { Color.white, Color.green, Color.yellow, Color.red, Color.magenta };
     private Color idealColor = Color.gray;
     private Color idealBorder = Color.black;
-    private List<FullScreenMode> modes = new() { FullScreenMode.FullScreenWindow, FullScreenMode.ExclusiveFullScreen, FullScreenMode.Windowed };
+    private List<FullScreenMode> modes = new List<FullScreenMode>() { FullScreenMode.FullScreenWindow, FullScreenMode.ExclusiveFullScreen, FullScreenMode.Windowed };
 #else
     private Color[] colors = { Colors.White, Colors.Green, Colors.Yellow, Colors.Red, Colors.Magenta };
     private Color idealColor = Colors.Gray;
     private Color idealBorder = Colors.Black;
-    private List<DisplayServer.WindowMode> modes = new() { DisplayServer.WindowMode.Fullscreen, DisplayServer.WindowMode.ExclusiveFullscreen, DisplayServer.WindowMode.Windowed };
+    private List<DisplayServer.WindowMode> modes = new List<FullScreenMode>() { DisplayServer.WindowMode.Fullscreen, DisplayServer.WindowMode.ExclusiveFullscreen, DisplayServer.WindowMode.Windowed };
 #endif
 
     private Thread thread = null;
