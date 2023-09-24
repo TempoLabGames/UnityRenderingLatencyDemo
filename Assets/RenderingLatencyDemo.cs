@@ -67,9 +67,15 @@ public partial class RenderingLatencyDemo : Node2D
     private int? maxIdealW;
 
 #if UNITY
-    private bool FullScreen => Screen.fullScreen;
+    // FullScreenMode.FullScreenWindow is as performant as FullScreenMode.ExclusiveFullScreen.
+    // https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/for-best-performance--use-dxgi-flip-model#call-to-action
+    private bool EfficientFullscreen => Screen.fullScreen;
 #else
-    private bool FullScreen => DisplayServer.WindowGetMode() >= DisplayServer.WindowMode.Fullscreen;
+    // DisplayServer.WindowMode.Fullscreen is intentionally drawn with a border,
+    // meaning it is expected to perform identically to DisplayServer.WindowMode.Windowed.
+    // DisplayServer.WindowMode.ExclusiveFullscreen is equivalent to Unity's FullScreenMode.FullScreenWindow.
+    // Godot does not have an equivalent to Unity's FullScreenMode.ExclusiveFullScreen.
+    private bool EfficientFullscreen => DisplayServer.WindowGetMode() == DisplayServer.WindowMode.ExclusiveFullscreen;
 #endif
 
     IntPtr xDisplay;
@@ -376,7 +382,7 @@ public partial class RenderingLatencyDemo : Node2D
             if (i != -1)
                 DrawVerticalLine(lineX, 0, height, colors[i]);
             int? minIdeal, maxIdeal;
-            if (FullScreen)
+            if (EfficientFullscreen)
             {
                 minIdeal = minIdealF;
                 maxIdeal = maxIdealF;
