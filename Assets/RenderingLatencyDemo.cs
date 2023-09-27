@@ -70,12 +70,16 @@ public partial class RenderingLatencyDemo : Node2D
     // FullScreenMode.FullScreenWindow is as performant as FullScreenMode.ExclusiveFullScreen.
     // https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/for-best-performance--use-dxgi-flip-model#call-to-action
     private bool EfficientFullscreen => Screen.fullScreen;
+    private bool CanTear = true;
 #else
     // DisplayServer.WindowMode.Fullscreen is intentionally drawn with a border,
     // meaning it is expected to perform identically to DisplayServer.WindowMode.Windowed.
     // DisplayServer.WindowMode.ExclusiveFullscreen is equivalent to Unity's FullScreenMode.FullScreenWindow.
     // Godot does not have an equivalent to Unity's FullScreenMode.ExclusiveFullScreen.
     private bool EfficientFullscreen => DisplayServer.WindowGetMode() == DisplayServer.WindowMode.ExclusiveFullscreen;
+    private bool vsyncMailbox = false;
+    private DisplayServer.VSyncMode VSyncOffMode => vsyncMailbox ? DisplayServer.VSyncMode.Mailbox : DisplayServer.VSyncMode.Disabled;
+    private bool CanTear => !vsyncMailbox;
 #endif
 
     IntPtr xDisplay;
@@ -210,6 +214,22 @@ public partial class RenderingLatencyDemo : Node2D
                 additionalFrameTimeMs = 0;
             updateHUDText();
         }
+#if !UNITY
+        if (GetKeyDown(KeyCode.V))
+        {
+            vsyncMailbox = !vsyncMailbox;
+            if (DisplayServer.WindowGetVsyncMode() != DisplayServer.VSyncMode.Enabled)
+            {
+                DisplayServer.WindowSetVsyncMode(VSyncOffMode);
+                // TODO: Consolidate mode switching code.
+                if (CanTear && minIdealF == 0)
+                    minIdealF = -1;
+                if (!CanTear && minIdealF == -1)
+                    minIdealF = 0;
+            }
+            updateHUDText();
+        }
+#endif
         if (GetKeyDown(KeyCode.Tab))
         {
 #if UNITY
@@ -270,7 +290,7 @@ public partial class RenderingLatencyDemo : Node2D
         {
             profileName = "Free; capped at refresh rate";
             // Negative latency can be achieved below tear lines.
-            minIdealF = -1;
+            minIdealF = CanTear ? -1 : 0;
             maxIdealF = 1;
             // No tearing occurs when windowed.
             minIdealW = 1;
@@ -280,7 +300,7 @@ public partial class RenderingLatencyDemo : Node2D
             QualitySettings.maxQueuedFrames = 1;
             Application.targetFrameRate = Screen.currentResolution.refreshRate;
 #else
-            DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+            DisplayServer.WindowSetVsyncMode(VSyncOffMode);
             // QualitySettings.maxQueuedFrames = 1;
             Engine.MaxFps = (int)DisplayServer.ScreenGetRefreshRate();
 #endif
@@ -290,7 +310,7 @@ public partial class RenderingLatencyDemo : Node2D
         {
             profileName = "Free; capped at double refresh rate";
             // Negative latency can be achieved below tear lines.
-            minIdealF = -1;
+            minIdealF = CanTear ? -1 : 0;
             maxIdealF = 1;
             // No tearing occurs when windowed.
             minIdealW = 1;
@@ -300,7 +320,7 @@ public partial class RenderingLatencyDemo : Node2D
             QualitySettings.maxQueuedFrames = 1;
             Application.targetFrameRate = Screen.currentResolution.refreshRate * 2;
 #else
-            DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+            DisplayServer.WindowSetVsyncMode(VSyncOffMode);
             // QualitySettings.maxQueuedFrames = 1;
             Engine.MaxFps = (int)(DisplayServer.ScreenGetRefreshRate() * 2);
 #endif
@@ -310,7 +330,7 @@ public partial class RenderingLatencyDemo : Node2D
         {
             profileName = "Free; uncapped";
             // Negative latency can be achieved below tear lines.
-            minIdealF = -1;
+            minIdealF = CanTear ? -1 : 0;
             maxIdealF = 0;
             // No tearing occurs when windowed.
             minIdealW = maxIdealW = 1;
@@ -319,7 +339,7 @@ public partial class RenderingLatencyDemo : Node2D
             QualitySettings.maxQueuedFrames = 1;
             Application.targetFrameRate = -1;
 #else
-            DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
+            DisplayServer.WindowSetVsyncMode(VSyncOffMode);
             // QualitySettings.maxQueuedFrames = 1;
             Engine.MaxFps = 0;
 #endif
@@ -446,6 +466,9 @@ public partial class RenderingLatencyDemo : Node2D
             "\n" +
             "Up/Down: Change mouse pixels per ms\n" +
             "Left/Right: Change additional frame time\n" +
+#if !UNITY
+            "V: Change uncapped VSync type (Disabled [tearing], Mailbox [no tearing])\n" +
+#endif
             "Tab: Change fullscreen type\n" +
             "Space: Start moving mouse\n" +
             "Esc: Stop moving mouse\n" +
@@ -537,6 +560,7 @@ class KeyCode
     public const Key Alpha3 = Key.Key3;
     public const Key Alpha4 = Key.Key4;
     public const Key Alpha5 = Key.Key5;
+    public const Key V = Key.V;
     public const Key Tab = Key.Tab;
     public const Key Space = Key.Space;
     public const Key Escape = Key.Escape;
@@ -551,6 +575,7 @@ class KeyCode
         Alpha3,
         Alpha4,
         Alpha5,
+        V,
         Tab,
         Space,
         Escape,
